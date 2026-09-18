@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel Admin - Criador de CV</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f2f5; }
+        .admin-login { display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .login-box { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
+        .login-box h2 { margin-bottom: 20px; color: #333; text-align: center; }
+        .login-box input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+        .login-box button { width: 100%; padding: 14px; background: #dc3545; color: white; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; margin-top: 10px; }
+        .login-box button:hover { background: #c82333; }
+        .admin-panel { display: none; }
+        .admin-header { background: #dc3545; color: white; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .admin-header h1 { font-size: 24px; }
+        .admin-header .admin-info { float: right; }
+        .admin-header button { background: white; color: #dc3545; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; margin-left: 10px; font-weight: bold; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .stat-card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .stat-card h3 { color: #666; font-size: 14px; margin-bottom: 10px; text-transform: uppercase; }
+        .stat-card .stat-value { font-size: 32px; font-weight: bold; color: #333; }
+        .stat-card .stat-icon { float: right; font-size: 48px; opacity: 0.2; }
+        .stat-card.revenue { border-left: 4px solid #28a745; }
+        .stat-card.pending { border-left: 4px solid #ffc107; }
+        .stat-card.approved { border-left: 4px solid #0066cc; }
+        .stat-card.users { border-left: 4px solid #6f42c1; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tab { background: white; padding: 12px 24px; border-radius: 6px; cursor: pointer; border: 2px solid transparent; font-weight: 500; }
+        .tab.active { background: #0066cc; color: white; }
+        .tab:hover:not(.active) { background: #f8f9fa; }
+        .payments-section { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .payments-section h2 { margin-bottom: 20px; color: #333; }
+        .payment-list { width: 100%; }
+        .payment-item { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #ffc107; }
+        .payment-item.approved { border-left-color: #28a745; }
+        .payment-item.rejected { border-left-color: #dc3545; }
+        .payment-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .payment-user { font-size: 18px; font-weight: bold; color: #333; }
+        .payment-date { color: #666; font-size: 14px; }
+        .payment-details { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
+        .payment-detail label { display: block; color: #666; font-size: 12px; margin-bottom: 5px; text-transform: uppercase; }
+        .payment-detail span { color: #333; font-size: 14px; font-weight: 500; }
+        .payment-proof { background: white; padding: 15px; border-radius: 6px; margin-bottom: 15px; }
+        .payment-proof label { display: block; color: #666; font-size: 12px; margin-bottom: 5px; text-transform: uppercase; }
+        .payment-proof-content { color: #333; word-break: break-all; }
+        .payment-proof-content img { max-width: 100%; max-height: 300px; border-radius: 6px; margin-top: 10px; }
+        .payment-actions { display: flex; gap: 10px; }
+        .btn-approve { background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .btn-approve:hover { background: #218838; }
+        .btn-reject { background: #dc3545; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .btn-reject:hover { background: #c82333; }
+        .empty-state { text-align: center; padding: 60px 20px; color: #999; }
+        .empty-state .icon { font-size: 64px; margin-bottom: 20px; }
+        .status-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: bold; }
+        .status-pending { background: #fff3cd; color: #856404; }
+        .status-approved { background: #d4edda; color: #155724; }
+        .status-rejected { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <div id="adminLogin" class="admin-login">
+        <div class="login-box">
+            <h2>🔐 Painel Administrativo</h2>
+            <input type="email" id="adminEmail" placeholder="Seu Email" value="afrikanbeatzao@gmail.com">
+            <input type="password" id="adminPass" placeholder="Sua Senha do Supabase">
+            <button onclick="adminLogin()">Entrar</button>
+        </div>
+    </div>
+
+    <div id="adminPanel" class="admin-panel">
+        <div class="admin-header">
+            <h1>📊 Painel Administrativo</h1>
+            <div class="admin-info">
+                <span id="adminEmailDisplay"></span>
+                <button onclick="adminLogout()">Sair</button>
+            </div>
+        </div>
+
+        <div class="container">
+            <div class="stats-grid">
+                <div class="stat-card revenue"><div class="stat-icon">💰</div><h3>Receita Total</h3><div class="stat-value" id="totalRevenue">0 KZ</div></div>
+                <div class="stat-card pending"><div class="stat-icon">⏳</div><h3>Pendentes</h3><div class="stat-value" id="pendingCount">0</div></div>
+                <div class="stat-card approved"><div class="stat-icon">✅</div><h3>Aprovados</h3><div class="stat-value" id="approvedCount">0</div></div>
+                <div class="stat-card users"><div class="stat-icon">👥</div><h3>Utilizadores</h3><div class="stat-value" id="totalUsers">0</div></div>
+            </div>
+
+            <div class="tabs">
+                <div class="tab active" onclick="switchTab('pending')">⏳ Pendentes</div>
+                <div class="tab" onclick="switchTab('approved')">✅ Aprovados</div>
+                <div class="tab" onclick="switchTab('rejected')">❌ Rejeitados</div>
+            </div>
+
+            <div class="payments-section">
+                <h2 id="sectionTitle">Pagamentos Pendentes</h2>
+                <div id="paymentList" class="payment-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://oamgwgeajteyrzuqfroi.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9hbWd3Z2VhanRleXJ6dXFmcm9pIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk3MzYxNjQsImV4cCI6MjEwNTMxMjE2NH0.mzjRw_mST33YheiDzCpOUcWYmwxAMk7hnwPn5O9aRMY';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let currentTab = 'pending';
+        let adminUser = null;
+        const PAYMENT_VALUE = 1000;
+
+        window.onload = async function() {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) { adminUser = session.user; showAdminPanel(); }
+        };
+
+        async function adminLogin() {
+            const email = document.getElementById('adminEmail').value;
+            const password = document.getElementById('adminPass').value;
+            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+            if (error) alert('❌ ' + error.message);
+            else { adminUser = data.user; showAdminPanel(); }
+        }
+
+        function showAdminPanel() {
+            document.getElementById('adminLogin').style.display = 'none';
+            document.getElementById('adminPanel').style.display = 'block';
+            document.getElementById('adminEmailDisplay').textContent = adminUser.email;
+            loadDashboard();
+        }
+
+        async function loadDashboard() {
+            const { data: users } = await supabase.from('users').select('id');
+            document.getElementById('totalUsers').textContent = users ? users.length : 0;
+
+            const { data: payments } = await supabase.from('payments').select('*');
+            if (payments) {
+                const approved = payments.filter(p => p.status === 'approved');
+                const pending = payments.filter(p => p.status === 'pending');
+                document.getElementById('totalRevenue').textContent = `${(approved.length * PAYMENT_VALUE).toLocaleString()} KZ`;
+                document.getElementById('pendingCount').textContent = pending.length;
+                document.getElementById('approvedCount').textContent = approved.length;
+            }
+            loadPayments();
+        }
+
+        function switchTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            const titles = { 'pending': 'Pagamentos Pendentes', 'approved': 'Pagamentos Aprovados', 'rejected': 'Pagamentos Rejeitados' };
+            document.getElementById('sectionTitle').textContent = titles[tab];
+            loadPayments();
+        }
+
+        async function loadPayments() {
+            const { data: payments } = await supabase.from('payments').select('*').eq('status', currentTab).order('created_at', { ascending: false });
+            const paymentList = document.getElementById('paymentList');
+
+            if (!payments || payments.length === 0) {
+                paymentList.innerHTML = `<div class="empty-state"><div class="icon">📭</div><p>Nenhum pagamento ${currentTab === 'pending' ? 'pendente' : currentTab === 'approved' ? 'aprovado' : 'rejeitado'}.</p></div>`;
+                return;
+            }
+
+            paymentList.innerHTML = payments.map(payment => {
+                const statusClass = payment.status === 'approved' ? 'approved' : payment.status === 'rejected' ? 'rejected' : '';
+                const statusText = payment.status === 'pending' ? 'PENDENTE' : payment.status === 'approved' ? 'APROVADO' : 'REJEITADO';
+                return `
+                    <div class="payment-item ${statusClass}">
+                        <div class="payment-header">
+                            <div class="payment-user">${payment.user_name}</div>
+                            <div><span class="status-badge status-${payment.status}">${statusText}</span><div class="payment-date">${new Date(payment.created_at).toLocaleString('pt-PT')}</div></div>
+                        </div>
+                        <div class="payment-details">
+                            <div class="payment-detail"><label>Email</label><span>${payment.user_email}</span></div>
+                            <div class="payment-detail"><label>Valor</label><span>1000 KZ</span></div>
+                        </div>
+                        <div class="payment-proof">
+                            <label>Comprovativo</label>
+                            <div class="payment-proof-content">
+                                ${payment.proof_url ? `<img src="${payment.proof_url}" alt="Comprovativo">` : ''}
+                                ${payment.proof_text ? `<p>Transação: ${payment.proof_text}</p>` : ''}
+                            </div>
+                        </div>
+                        ${payment.status === 'pending' ? `
+                            <div class="payment-actions">
+                                <button class="btn-approve" onclick="approvePayment('${payment.id}', '${payment.user_id}')">✅ Aprovar</button>
+                                <button class="btn-reject" onclick="rejectPayment('${payment.id}')">❌ Rejeitar</button>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function approvePayment(paymentId, userId) {
+            if (!confirm('✅ Confirmar aprovação?')) return;
+            await supabase.from('payments').update({ status: 'approved', approved_at: new Date().toISOString() }).eq('id', paymentId);
+            await supabase.from('users').update({ is_premium: true }).eq('id', userId);
+            alert('✅ Aprovado! O utilizador agora é PREMIUM.');
+            loadDashboard();
+        }
+
+        async function rejectPayment(paymentId) {
+            if (!confirm('❌ Confirmar rejeição?')) return;
+            await supabase.from('payments').update({ status: 'rejected' }).eq('id', paymentId);
+            alert('❌ Rejeitado.');
+            loadDashboard();
+        }
+
+        async function adminLogout() {
+            await supabase.auth.signOut();
+            adminUser = null;
+            document.getElementById('adminLogin').style.display = 'flex';
+            document.getElementById('adminPanel').style.display = 'none';
+        }
+    </script>
+</body>
+</html>

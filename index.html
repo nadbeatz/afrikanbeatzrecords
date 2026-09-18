@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Criador de CV - Angola</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/2.4.0/html2pdf.bundle.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f2f5; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .auth-screen { display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .auth-box { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
+        .auth-box h2 { margin-bottom: 20px; color: #333; text-align: center; }
+        .auth-box input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+        .auth-box button { width: 100%; padding: 14px; background: #0066cc; color: white; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; margin-top: 10px; }
+        .auth-box button:hover { background: #0052a3; }
+        .auth-box .toggle { text-align: center; margin-top: 15px; color: #666; }
+        .auth-box .toggle a { color: #0066cc; cursor: pointer; text-decoration: underline; }
+        .app-screen { display: none; }
+        .header { background: white; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .header h1 { color: #0066cc; font-size: 24px; }
+        .header .user-info { float: right; color: #666; }
+        .header button { background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; margin-left: 10px; }
+        .main-content { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .form-section, .preview-section { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .form-section h3 { color: #333; margin-bottom: 20px; border-bottom: 2px solid #0066cc; padding-bottom: 10px; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; color: #555; font-weight: 500; }
+        .form-group input, .form-group textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+        .form-group textarea { min-height: 80px; resize: vertical; }
+        .btn-primary { background: #28a745; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-size: 16px; width: 100%; margin-top: 10px; }
+        .btn-primary:hover { background: #218838; }
+        .cv-preview { position: relative; border: 1px solid #ddd; padding: 40px; min-height: 600px; background: white; }
+        .watermark { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg); font-size: 48px; color: rgba(255, 0, 0, 0.25); font-weight: bold; pointer-events: none; z-index: 1000; white-space: nowrap; }
+        .cv-header { border-bottom: 3px solid #0066cc; padding-bottom: 15px; margin-bottom: 20px; }
+        .cv-header h2 { color: #0066cc; font-size: 28px; margin-bottom: 5px; }
+        .cv-header p { color: #666; font-size: 14px; margin: 3px 0; }
+        .cv-section { margin-bottom: 20px; }
+        .cv-section h3 { color: #333; font-size: 18px; margin-bottom: 10px; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
+        .cv-section p { color: #555; line-height: 1.6; font-size: 14px; }
+        .btn-download { background: #0066cc; color: white; border: none; padding: 14px 24px; border-radius: 6px; cursor: pointer; font-size: 16px; width: 100%; margin-top: 15px; }
+        .btn-download:hover { background: #0052a3; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 40px; border-radius: 12px; max-width: 500px; width: 90%; max-height: 90vh; overflow-y: auto; }
+        .modal-content h3 { color: #333; margin-bottom: 20px; }
+        .payment-info { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 15px 0; }
+        .payment-info p { margin: 10px 0; color: #333; }
+        .payment-info strong { color: #0066cc; }
+        .close-modal { background: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; margin-top: 10px; }
+        .status-badge { display: inline-block; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+        .status-free { background: #fff3cd; color: #856404; }
+        .status-premium { background: #d4edda; color: #155724; }
+        .file-upload { position: relative; }
+        .file-upload input[type="file"] { display: none; }
+        .file-upload-label { display: block; padding: 12px; background: #f8f9fa; border: 2px dashed #ddd; border-radius: 6px; text-align: center; cursor: pointer; color: #666; }
+        .file-upload-label:hover { background: #e9ecef; }
+        .file-name { margin-top: 10px; font-size: 14px; color: #28a745; }
+    </style>
+</head>
+<body>
+    <div id="authScreen" class="auth-screen">
+        <div class="auth-box">
+            <h2 id="authTitle">Criar Conta</h2>
+            <input type="text" id="authName" placeholder="Seu Nome" required>
+            <input type="email" id="authEmail" placeholder="Seu Email" required>
+            <input type="password" id="authPassword" placeholder="Senha (mínimo 6 caracteres)" required>
+            <button onclick="handleAuth()">Cadastrar</button>
+            <div class="toggle">
+                <span id="toggleText">Já tem conta?</span>
+                <a onclick="toggleAuth()" id="toggleLink">Faça login</a>
+            </div>
+        </div>
+    </div>
+
+    <div id="appScreen" class="app-screen">
+        <div class="header">
+            <h1>📄 Criador de CV - Angola</h1>
+            <div class="user-info">
+                <span id="userName"></span>
+                <span id="statusBadge" class="status-badge status-free">GRÁTIS</span>
+                <button onclick="logout()">Sair</button>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="form-section">
+                <h3>📝 Dados Pessoais</h3>
+                <div class="form-group"><label>Nome Completo</label><input type="text" id="cvName" oninput="updatePreview()" placeholder="Ex: João Silva"></div>
+                <div class="form-group"><label>Email</label><input type="email" id="cvEmail" oninput="updatePreview()" placeholder="joao@email.com"></div>
+                <div class="form-group"><label>Telefone</label><input type="tel" id="cvPhone" oninput="updatePreview()" placeholder="+244 923 456 789"></div>
+                <div class="form-group"><label>Endereço</label><input type="text" id="cvAddress" oninput="updatePreview()" placeholder="Luanda, Angola"></div>
+
+                <h3 style="margin-top: 30px;">💼 Experiência Profissional</h3>
+                <div class="form-group"><label>Cargo e Empresa</label><input type="text" id="cvJob" oninput="updatePreview()" placeholder="Ex: Desenvolvedor na Empresa X"></div>
+                <div class="form-group"><label>Período</label><input type="text" id="cvPeriod" oninput="updatePreview()" placeholder="Ex: 2020 - Presente"></div>
+                <div class="form-group"><label>Descrição</label><textarea id="cvJobDesc" oninput="updatePreview()" placeholder="Descreva suas principais responsabilidades..."></textarea></div>
+
+                <h3 style="margin-top: 30px;">🎓 Educação</h3>
+                <div class="form-group"><label>Curso e Instituição</label><input type="text" id="cvEducation" oninput="updatePreview()" placeholder="Ex: Engenharia Informática - UAN"></div>
+                <div class="form-group"><label>Período</label><input type="text" id="cvEduPeriod" oninput="updatePreview()" placeholder="Ex: 2016 - 2020"></div>
+
+                <h3 style="margin-top: 30px;">🛠️ Habilidades</h3>
+                <div class="form-group"><label>Principais Habilidades</label><textarea id="cvSkills" oninput="updatePreview()" placeholder="Ex: Microsoft Office, Gestão de Projetos..."></textarea></div>
+
+                <button class="btn-primary" onclick="saveCV()">💾 Salvar Currículo</button>
+            </div>
+
+            <div class="preview-section">
+                <h3>👁️ Prévia do Currículo</h3>
+                <div id="cvPreview" class="cv-preview">
+                    <div id="watermark" class="watermark">CV GRATUITO</div>
+                    <div class="cv-header">
+                        <h2 id="prevName">Seu Nome Aqui</h2>
+                        <p id="prevEmail">email@exemplo.com</p>
+                        <p id="prevPhone">+244 000 000 000</p>
+                        <p id="prevAddress">Luanda, Angola</p>
+                    </div>
+                    <div class="cv-section">
+                        <h3>💼 Experiência Profissional</h3>
+                        <p><strong id="prevJob">Cargo - Empresa</strong></p>
+                        <p id="prevPeriod">Período</p>
+                        <p id="prevJobDesc">Descrição das atividades...</p>
+                    </div>
+                    <div class="cv-section">
+                        <h3>🎓 Educação</h3>
+                        <p><strong id="prevEducation">Curso - Instituição</strong></p>
+                        <p id="prevEduPeriod">Período</p>
+                    </div>
+                    <div class="cv-section">
+                        <h3>🛠️ Habilidades</h3>
+                        <p id="prevSkills">Suas habilidades aparecerão aqui...</p>
+                    </div>
+                </div>
+                <button class="btn-download" onclick="downloadCV()">📥 Baixar PDF</button>
+                <button class="btn-download" style="background: #ffc107; margin-top: 10px; color: #333;" onclick="openPaymentModal()">⭐ Remover Marca D'Água - 1000 KZ</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="paymentModal" class="modal">
+        <div class="modal-content">
+            <h3>💳 Remover Marca D'Água</h3>
+            <p style="margin-bottom: 20px; color: #666;">Pague 1000 KZ para remover a marca d'água e baixar seu CV limpo.</p>
+            <div class="payment-info">
+                <p><strong>📱 Unitel Express / Multicaixa Express:</strong></p>
+                <p>Número: <strong>923 456 789</strong> (Substitua pelo teu)</p>
+                <p>Nome: <strong>Teu Nome Aqui</strong></p>
+                <p>Valor: <strong>1000 KZ</strong></p>
+            </div>
+            <div class="form-group">
+                <label>Envie o Comprovativo (imagem)</label>
+                <div class="file-upload">
+                    <input type="file" id="paymentFile" accept="image/*" onchange="handleFileSelect(event)">
+                    <label for="paymentFile" class="file-upload-label">📎 Clique para enviar imagem do comprovativo</label>
+                    <div id="fileName" class="file-name"></div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Ou digite o número da transação</label>
+                <input type="text" id="paymentProof" placeholder="Ex: Transação #12345">
+            </div>
+            <button class="btn-primary" onclick="submitPayment()">✅ Enviar Comprovativo</button>
+            <button class="close-modal" onclick="closePaymentModal()">Cancelar</button>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://oamgwgeajteyrzuqfroi.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9hbWd3Z2VhanRleXJ6dXFmcm9pIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk3MzYxNjQsImV4cCI6MjEwNTMxMjE2NH0.mzjRw_mST33YheiDzCpOUcWYmwxAMk7hnwPn5O9aRMY';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let currentUser = null;
+        let isLoginMode = false;
+        let selectedFile = null;
+
+        window.onload = async function() {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) await loadUserData(session.user);
+        };
+
+        function toggleAuth() {
+            isLoginMode = !isLoginMode;
+            document.getElementById('authTitle').textContent = isLoginMode ? 'Entrar' : 'Criar Conta';
+            document.getElementById('toggleText').textContent = isLoginMode ? 'Não tem conta?' : 'Já tem conta?';
+            document.getElementById('toggleLink').textContent = isLoginMode ? 'Cadastre-se' : 'Faça login';
+            document.querySelector('.auth-box button').textContent = isLoginMode ? 'Entrar' : 'Cadastrar';
+            document.getElementById('authName').style.display = isLoginMode ? 'none' : 'block';
+        }
+
+        async function handleAuth() {
+            const name = document.getElementById('authName').value;
+            const email = document.getElementById('authEmail').value;
+            const password = document.getElementById('authPassword').value;
+
+            if (!email || !password) { alert('Preencha todos os campos!'); return; }
+
+            if (isLoginMode) {
+                const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+                if (error) alert('❌ ' + error.message);
+                else await loadUserData(data.user);
+            } else {
+                if (!name) { alert('Preencha seu nome!'); return; }
+                const { data, error } = await supabase.auth.signUp({ email, password });
+                if (error) { alert('❌ ' + error.message); } 
+                else {
+                    await supabase.from('users').insert({ email, name, is_premium: false });
+                    alert('✅ Conta criada! Verifique o email se necessário.');
+                    await loadUserData(data.user);
+                }
+            }
+        }
+
+        async function loadUserData(user) {
+            const { data: userData } = await supabase.from('users').select('*').eq('email', user.email).single();
+            if (userData) {
+                currentUser = { ...user, ...userData };
+                document.getElementById('authScreen').style.display = 'none';
+                document.getElementById('appScreen').style.display = 'block';
+                document.getElementById('userName').textContent = currentUser.name;
+                updateStatusBadge();
+                await loadCV();
+            }
+        }
+
+        function updateStatusBadge() {
+            const badge = document.getElementById('statusBadge');
+            if (currentUser.is_premium) {
+                badge.textContent = 'PREMIUM';
+                badge.className = 'status-badge status-premium';
+                document.getElementById('watermark').style.display = 'none';
+            } else {
+                badge.textContent = 'GRÁTIS';
+                badge.className = 'status-badge status-free';
+                document.getElementById('watermark').style.display = 'block';
+            }
+        }
+
+        function updatePreview() {
+            document.getElementById('prevName').textContent = document.getElementById('cvName').value || 'Seu Nome Aqui';
+            document.getElementById('prevEmail').textContent = document.getElementById('cvEmail').value || 'email@exemplo.com';
+            document.getElementById('prevPhone').textContent = document.getElementById('cvPhone').value || '+244 000 000 000';
+            document.getElementById('prevAddress').textContent = document.getElementById('cvAddress').value || 'Luanda, Angola';
+            document.getElementById('prevJob').textContent = document.getElementById('cvJob').value || 'Cargo - Empresa';
+            document.getElementById('prevPeriod').textContent = document.getElementById('cvPeriod').value || 'Período';
+            document.getElementById('prevJobDesc').textContent = document.getElementById('cvJobDesc').value || 'Descrição...';
+            document.getElementById('prevEducation').textContent = document.getElementById('cvEducation').value || 'Curso - Instituição';
+            document.getElementById('prevEduPeriod').textContent = document.getElementById('cvEduPeriod').value || 'Período';
+            document.getElementById('prevSkills').textContent = document.getElementById('cvSkills').value || 'Habilidades...';
+        }
+
+        async function saveCV() {
+            const cvData = {
+                user_id: currentUser.id,
+                name: document.getElementById('cvName').value,
+                email: document.getElementById('cvEmail').value,
+                phone: document.getElementById('cvPhone').value,
+                address: document.getElementById('cvAddress').value,
+                job: document.getElementById('cvJob').value,
+                period: document.getElementById('cvPeriod').value,
+                job_desc: document.getElementById('cvJobDesc').value,
+                education: document.getElementById('cvEducation').value,
+                edu_period: document.getElementById('cvEduPeriod').value,
+                skills: document.getElementById('cvSkills').value
+            };
+            const { error } = await supabase.from('cvs').upsert(cvData, { onConflict: 'user_id' });
+            if (error) alert('❌ Erro: ' + error.message);
+            else alert('✅ Currículo salvo!');
+        }
+
+        async function loadCV() {
+            const { data } = await supabase.from('cvs').select('*').eq('user_id', currentUser.id).single();
+            if (data) {
+                document.getElementById('cvName').value = data.name || '';
+                document.getElementById('cvEmail').value = data.email || '';
+                document.getElementById('cvPhone').value = data.phone || '';
+                document.getElementById('cvAddress').value = data.address || '';
+                document.getElementById('cvJob').value = data.job || '';
+                document.getElementById('cvPeriod').value = data.period || '';
+                document.getElementById('cvJobDesc').value = data.job_desc || '';
+                document.getElementById('cvEducation').value = data.education || '';
+                document.getElementById('cvEduPeriod').value = data.edu_period || '';
+                document.getElementById('cvSkills').value = data.skills || '';
+                updatePreview();
+            }
+        }
+
+        function downloadCV() {
+            const element = document.getElementById('cvPreview');
+            const opt = { margin: 0, filename: `CV_${currentUser.name.replace(/\s+/g, '_')}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } };
+            html2pdf().set(opt).from(element).save();
+        }
+
+        function openPaymentModal() {
+            if (currentUser.is_premium) { alert('✅ Você já é PREMIUM!'); return; }
+            document.getElementById('paymentModal').style.display = 'flex';
+        }
+
+        function closePaymentModal() {
+            document.getElementById('paymentModal').style.display = 'none';
+            document.getElementById('paymentProof').value = '';
+            document.getElementById('fileName').textContent = '';
+            selectedFile = null;
+        }
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) { selectedFile = file; document.getElementById('fileName').textContent = '✅ ' + file.name; }
+        }
+
+        async function submitPayment() {
+            const proofText = document.getElementById('paymentProof').value;
+            if (!selectedFile && !proofText) { alert('Envie o comprovativo!'); return; }
+
+            let proofUrl = null;
+            if (selectedFile) {
+                const fileExt = selectedFile.name.split('.').pop();
+                const fileName = `${currentUser.id}_${Date.now()}.${fileExt}`;
+                const { error: uploadError } = await supabase.storage.from('payment-proofs').upload(fileName, selectedFile);
+                if (uploadError) { alert('❌ Erro no upload: ' + uploadError.message); return; }
+                const { data: urlData } = supabase.storage.from('payment-proofs').getPublicUrl(fileName);
+                proofUrl = urlData.publicUrl;
+            }
+
+            const { error } = await supabase.from('payments').insert({
+                user_id: currentUser.id, user_email: currentUser.email, user_name: currentUser.name,
+                proof_url: proofUrl, proof_text: proofText, amount: 1000, status: 'pending'
+            });
+
+            if (error) alert('❌ Erro: ' + error.message);
+            else { alert('✅ Comprovativo enviado! Será verificado em até 2 horas.'); closePaymentModal(); }
+        }
+
+        async function logout() {
+            await supabase.auth.signOut();
+            currentUser = null;
+            document.getElementById('authScreen').style.display = 'flex';
+            document.getElementById('appScreen').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
