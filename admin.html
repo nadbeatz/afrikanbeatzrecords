@@ -103,27 +103,42 @@
     </div>
 
     <script>
+        // CONFIGURAÇÃO DO SUPABASE
         const SUPABASE_URL = 'https://oamgwgeajteyrzuqfroi.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9hbWd3Z2VhanRleXJ6dXFmcm9pIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk3MzYxNjQsImV4cCI6MjEwNTMxMjE2NH0.mzjRw_mST33YheiDzCpOUcWYmwxAMk7hnwPn5O9aRMY';
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        // Criar cliente Supabase (APENAS UMA VEZ)
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         let currentTab = 'pending';
         let adminUser = null;
         const PAYMENT_VALUE = 1000;
 
+        // Verificar login ao carregar
         window.onload = async function() {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session) { adminUser = session.user; showAdminPanel(); }
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (session) {
+                adminUser = session.user;
+                showAdminPanel();
+            }
         };
 
+        // Login do Admin
         async function adminLogin() {
             const email = document.getElementById('adminEmail').value;
             const password = document.getElementById('adminPass').value;
-            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-            if (error) alert('❌ ' + error.message);
-            else { adminUser = data.user; showAdminPanel(); }
+
+            const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+
+            if (error) {
+                alert('❌ Erro: ' + error.message);
+            } else {
+                adminUser = data.user;
+                showAdminPanel();
+            }
         }
 
+        // Mostrar Painel
         function showAdminPanel() {
             document.getElementById('adminLogin').style.display = 'none';
             document.getElementById('adminPanel').style.display = 'block';
@@ -131,52 +146,89 @@
             loadDashboard();
         }
 
+        // Carregar Dashboard
         async function loadDashboard() {
-            const { data: users } = await supabase.from('users').select('id');
+            // Total de utilizadores
+            const { data: users } = await supabaseClient.from('users').select('id');
             document.getElementById('totalUsers').textContent = users ? users.length : 0;
 
-            const { data: payments } = await supabase.from('payments').select('*');
+            // Pagamentos
+            const { data: payments } = await supabaseClient.from('payments').select('*');
+
             if (payments) {
                 const approved = payments.filter(p => p.status === 'approved');
                 const pending = payments.filter(p => p.status === 'pending');
-                document.getElementById('totalRevenue').textContent = `${(approved.length * PAYMENT_VALUE).toLocaleString()} KZ`;
+                const totalRevenue = approved.length * PAYMENT_VALUE;
+
+                document.getElementById('totalRevenue').textContent = `${totalRevenue.toLocaleString()} KZ`;
                 document.getElementById('pendingCount').textContent = pending.length;
                 document.getElementById('approvedCount').textContent = approved.length;
             }
+
             loadPayments();
         }
 
+        // Alternar Tabs
         function switchTab(tab) {
             currentTab = tab;
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             event.target.classList.add('active');
-            const titles = { 'pending': 'Pagamentos Pendentes', 'approved': 'Pagamentos Aprovados', 'rejected': 'Pagamentos Rejeitados' };
+
+            const titles = {
+                'pending': 'Pagamentos Pendentes',
+                'approved': 'Pagamentos Aprovados',
+                'rejected': 'Pagamentos Rejeitados'
+            };
             document.getElementById('sectionTitle').textContent = titles[tab];
+
             loadPayments();
         }
 
+        // Carregar Lista de Pagamentos
         async function loadPayments() {
-            const { data: payments } = await supabase.from('payments').select('*').eq('status', currentTab).order('created_at', { ascending: false });
+            const { data: payments } = await supabaseClient
+                .from('payments')
+                .select('*')
+                .eq('status', currentTab)
+                .order('created_at', { ascending: false });
+
             const paymentList = document.getElementById('paymentList');
 
             if (!payments || payments.length === 0) {
-                paymentList.innerHTML = `<div class="empty-state"><div class="icon">📭</div><p>Nenhum pagamento ${currentTab === 'pending' ? 'pendente' : currentTab === 'approved' ? 'aprovado' : 'rejeitado'}.</p></div>`;
+                paymentList.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">📭</div>
+                        <p>Nenhum pagamento ${currentTab === 'pending' ? 'pendente' : currentTab === 'approved' ? 'aprovado' : 'rejeitado'}.</p>
+                    </div>
+                `;
                 return;
             }
 
             paymentList.innerHTML = payments.map(payment => {
                 const statusClass = payment.status === 'approved' ? 'approved' : payment.status === 'rejected' ? 'rejected' : '';
                 const statusText = payment.status === 'pending' ? 'PENDENTE' : payment.status === 'approved' ? 'APROVADO' : 'REJEITADO';
+
                 return `
                     <div class="payment-item ${statusClass}">
                         <div class="payment-header">
                             <div class="payment-user">${payment.user_name}</div>
-                            <div><span class="status-badge status-${payment.status}">${statusText}</span><div class="payment-date">${new Date(payment.created_at).toLocaleString('pt-PT')}</div></div>
+                            <div>
+                                <span class="status-badge status-${payment.status}">${statusText}</span>
+                                <div class="payment-date">${new Date(payment.created_at).toLocaleString('pt-PT')}</div>
+                            </div>
                         </div>
+
                         <div class="payment-details">
-                            <div class="payment-detail"><label>Email</label><span>${payment.user_email}</span></div>
-                            <div class="payment-detail"><label>Valor</label><span>1000 KZ</span></div>
+                            <div class="payment-detail">
+                                <label>Email</label>
+                                <span>${payment.user_email}</span>
+                            </div>
+                            <div class="payment-detail">
+                                <label>Valor</label>
+                                <span>1000 KZ</span>
+                            </div>
                         </div>
+
                         <div class="payment-proof">
                             <label>Comprovativo</label>
                             <div class="payment-proof-content">
@@ -184,6 +236,7 @@
                                 ${payment.proof_text ? `<p>Transação: ${payment.proof_text}</p>` : ''}
                             </div>
                         </div>
+
                         ${payment.status === 'pending' ? `
                             <div class="payment-actions">
                                 <button class="btn-approve" onclick="approvePayment('${payment.id}', '${payment.user_id}')">✅ Aprovar</button>
@@ -195,23 +248,56 @@
             }).join('');
         }
 
+        // Aprovar Pagamento
         async function approvePayment(paymentId, userId) {
-            if (!confirm('✅ Confirmar aprovação?')) return;
-            await supabase.from('payments').update({ status: 'approved', approved_at: new Date().toISOString() }).eq('id', paymentId);
-            await supabase.from('users').update({ is_premium: true }).eq('id', userId);
-            alert('✅ Aprovado! O utilizador agora é PREMIUM.');
+            if (!confirm('✅ Confirmar aprovação deste pagamento?')) return;
+
+            // Atualizar status do pagamento
+            const { error: paymentError } = await supabaseClient
+                .from('payments')
+                .update({ status: 'approved', approved_at: new Date().toISOString() })
+                .eq('id', paymentId);
+
+            if (paymentError) {
+                alert('❌ Erro ao aprovar: ' + paymentError.message);
+                return;
+            }
+
+            // Atualizar utilizador para PREMIUM
+            const { error: userError } = await supabaseClient
+                .from('users')
+                .update({ is_premium: true })
+                .eq('id', userId);
+
+            if (userError) {
+                alert('❌ Erro ao atualizar utilizador: ' + userError.message);
+                return;
+            }
+
+            alert('✅ Pagamento aprovado! O utilizador agora é PREMIUM.');
             loadDashboard();
         }
 
+        // Rejeitar Pagamento
         async function rejectPayment(paymentId) {
-            if (!confirm('❌ Confirmar rejeição?')) return;
-            await supabase.from('payments').update({ status: 'rejected' }).eq('id', paymentId);
-            alert('❌ Rejeitado.');
-            loadDashboard();
+            if (!confirm('❌ Confirmar rejeição deste pagamento?')) return;
+
+            const { error } = await supabaseClient
+                .from('payments')
+                .update({ status: 'rejected' })
+                .eq('id', paymentId);
+
+            if (error) {
+                alert('❌ Erro ao rejeitar: ' + error.message);
+            } else {
+                alert('❌ Pagamento rejeitado.');
+                loadDashboard();
+            }
         }
 
+        // Logout
         async function adminLogout() {
-            await supabase.auth.signOut();
+            await supabaseClient.auth.signOut();
             adminUser = null;
             document.getElementById('adminLogin').style.display = 'flex';
             document.getElementById('adminPanel').style.display = 'none';
